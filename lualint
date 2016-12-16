@@ -96,9 +96,17 @@ local ignoreget = Set{
 "assert", "collectgarbage", "coroutine", "debug", "dofile", "error",
 "gcinfo", "getfenv", "getmetatable", "io", "ipairs", "loadfile",
 "loadlib", "loadstring", "math", "newproxy", "next", "os", "pairs",
-"pcall", "print", "rawequal", "rawget", "rawset", "require",
+"pcall", "print", "rawequal", "rawget", "rawset", "require", "select",
 "setfenv", "setmetatable", "string", "table", "tonumber", "tostring",
 "type", "unpack", "xpcall",
+
+-- ROBLOX SPECIFIC VARS --
+-- variables
+"game", "Enum", "plugin", "script", "shared", "workspace",
+-- functions
+"delay", "DebuggerManager", "elapsedTime", "LoadLibrary", "PluginManager", "settings", "spawn", "stats", "tick", "time", "typeof",  "UserSettings", "version", "wait", "warn",
+-- Data Constructors
+"Axes", "BrickColor", "CFrame", "Color3", "ColorSequence", "ColorSequenceKeypoint", "Faces", "Instance", "NumberRange", "NumberSequence", "NumberSequenceKeypoint", "PhysicalProperties", "Ray", "Rect", "Region3", "Region3int16", "UDim", "UDim2", "Vector2", "Vector3", "Vector3int16",
 }
 
 local function fileexists(fname)
@@ -194,9 +202,12 @@ local function scanfile(filename)
     end
     
     -- 	4	[2]	GETGLOBAL	0 0	; require
-    local found, _, lineno, instr, gname = string.find(line, "%[(%d+)%]%s+([SG]ETGLOBAL).-; (.+)")
+    --local found, _, lineno, instr, gname = string.find(line, "%[(%d+)%]%s+([SG]ETGLOBAL).-; (.+)")
+    --if found then
+    --  local t = refs[curfunc] or {SETGLOBAL={n=0}, GETGLOBAL={n=0}}
+    local found, _, lineno, instr, gname = string.find(line, "%[(%d+)%]%s+([SG]ETTABUP).-; _ENV \"(.+)\"")
     if found then
-      local t = refs[curfunc] or {SETGLOBAL={n=0}, GETGLOBAL={n=0}}
+      local t = refs[curfunc] or {SETTABUP={n=0}, GETTABUP={n=0}}
       local err = {name=gname, lineno=lineno}
       table.insert(t[instr], err)
       refs[curfunc] = t
@@ -241,9 +252,9 @@ local function print_lint_output()
 
    for file,info in pairs(g_output) do
       table.sort(info, row_compare)
-      for k,error in pairs(info) do
-	 -- error[1] is the row and error[2] is the description
-      	 print(string.format("%s:%d: %s", file, error[1], error[2]))
+      for _, lua_error in pairs(info) do
+   -- error[1] is the row and error[2] is the description
+        print(string.format("%s:%d: %s", file, lua_error[1], lua_error[2]))
       end
    end
 end
@@ -308,7 +319,8 @@ local function lint(filename, relaxed)
   end
 
   for f,t in pairs(refs) do
-    for _,r in ipairs(t.SETGLOBAL) do
+    -- for _,r in ipairs(t.SETGLOBAL) do
+    for _,r in ipairs(t.SETTABUP) do
       if r.name ~= self_name and not declaredset[r.name] then
         was_set[r.name] = true
         if not relaxed then
@@ -318,9 +330,9 @@ local function lint(filename, relaxed)
       end
     end
   end
-
   for f,t in pairs(refs) do
-    for _,r in ipairs(t.GETGLOBAL) do
+    -- for _,r in ipairs(t.GETGLOBAL) do
+    for _,r in ipairs(t.GETTABUP) do
       if will_warn_for(r.name) then
         lint_output(filename, r.lineno, string.format("*** global get of %s", r.name))
         found_gets = true
